@@ -1,0 +1,33 @@
+
+Team:
+Sixiang Gu 903-943-192
+Rose Liu 804-035-209
+
+------------------------------------------------------------------------------------------------------------------------------
+Describe any design decisions you made. These may be minimal for Lab 
+
+Two significant design decisions we made while completing this lab was to create our own iterator classes for the HeapPage and HeapFile classes respectively. This is because a standard iterator cast as type, Tuple (Iterator<Tuple>) is not equipped to parse and handle the data in a Tuple. 
+
+A second design design we made was to use an array to hold our Fields in the Tuple class. We realized  while completing the skeleton function Iterator, that if we had created an arrayList to hold our Fields instead of an array, this iterator function would have been easier to implement. However, because our code had been written to handle an array of Fields, we implemented Iterator by wrapping our Fields array in a list and returning an iterator to this list.
+
+In the Catalog and BufferPool classes, we initially created HashMaps as private variables to map our data. However, we noticed later on that a ConcurrentHashMap library had been included and realized that a ConcurrentHashMap would better handle multiple functions accessing the same tables at once.
+
+------------------------------------------------------------------------------------------------------------------------------
+
+Discuss and justify any changes you made to the API
+
+We did not make any significant changes to the API. 
+
+------------------------------------------------------------------------------------------------------------------------------
+
+Describe any missing or incomplete elements of your code.
+
+There are no missing or incomplete elements of our code. 
+
+------------------------------------------------------------------------------------------------------------------------------
+
+Describe how long you spent on the project, and whether there was anything you found particularly difficult or confusing.
+
+We worked on this project for around 10 hours. Getting a comprehensive understanding of the different classes in SimpleDB and how they correlated and interacted with each other was one of the most difficult problems we faced. Furthermore, while debugging, it was particularly difficult to trace through the test code and figure out which of our functions was actually causing the error. This problem was exacerbated by the fact that we were not extremely familiar with Java and some of our errors were syntax or out of bounds errors in our Java implementation. 
+
+Specifically, the most difficult classes to implement were HeapPage and HeapFile because they were difficult to comprehensively understand and we had to write our own iterators. The getPage function in BufferPool was also slightly confusing because our exception catching was trying to access out of the bounds of the data and we had to identify why. 

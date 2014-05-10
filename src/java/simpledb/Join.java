@@ -14,6 +14,15 @@ public class Join extends Operator {
     private DbIterator m_child2;
     
     private JoinPredicate m_p;
+    
+    private DbIterator cur_outer;
+    
+    private boolean inner_not_done = false;
+    
+    private boolean need_more_outer = true;
+    
+    private Tuple child1_tuple = null;
+    
 
     /**
      * Constructor. Accepts to children to join and the predicate to join them
@@ -99,20 +108,34 @@ public class Join extends Operator {
      * @see JoinPredicate#filter
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-    	try{
-    		while(m_child1.hasNext()){
-            	Tuple cur_child1_tuple = m_child1.next();
-            	while(m_child2.hasNext()){
-            		Tuple cur_child2_tuple = m_child2.next();
-            		if(m_p.filter(cur_child1_tuple, cur_child2_tuple)){
-            			Tuple join_tuple = new Tuple(this.getTupleDesc());
-            			return join_tuple;
-            		}
-            	}   			
-    		}
-    	}catch(NoSuchElementException e){
-    		return null;
+    	if(!inner_not_done){
+    		need_more_outer = m_child1.hasNext();
     	}
+        while(need_more_outer){
+        	if(!inner_not_done){
+        		child1_tuple = m_child1.next();
+        	}
+        	int child1_num_field = child1_tuple.getTupleDesc().numFields();
+        	while(m_child2.hasNext()){
+        		Tuple child2_tuple = m_child2.next();
+        		int child2_num_field = child2_tuple.getTupleDesc().numFields();
+        		if(this.getJoinPredicate().filter(child1_tuple, child2_tuple)){
+        			inner_not_done = true;
+            		Tuple result = new Tuple(this.getTupleDesc());
+            		for(int i = 0; i < child1_num_field;i++){
+            			result.setField(i, child1_tuple.getField(i));
+            		}
+            		for(int j = 0; j < child2_num_field;j++){
+            			result.setField(j+child1_num_field, child2_tuple.getField(j));
+            		}
+            		return result;
+        		}
+        	}
+        	inner_not_done = false;
+        	need_more_outer = m_child1.hasNext();
+        	m_child2.rewind();
+    	}
+        return null;
     }
 
     @Override

@@ -26,6 +26,7 @@ public class BufferPool {
     private int m_numpages;
     
     private ConcurrentHashMap<PageId, Page> ccmap;
+
     
     /** Default number of pages passed to the constructor. This is used by
     other classes. BufferPool should use the numPages argument to the
@@ -142,6 +143,9 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+    	Catalog cur_catalog = Database.getCatalog();
+    	DbFile file = cur_catalog.getDatabaseFile(tableId);
+    	file.insertTuple(tid, t);
     }
 
     /**
@@ -160,6 +164,9 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+    	Catalog cur_catalog = Database.getCatalog();
+    	DbFile file = cur_catalog.getDatabaseFile( t.getRecordId().getPageId().getTableId());
+    	file.deleteTuple(tid, t);
     }
 
     /**

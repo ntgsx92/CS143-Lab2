@@ -21,6 +21,7 @@ public class StringAggregator implements Aggregator {
 	
 	private int no_grouping_agg;//integer  which stores aggregate value when no_grouping is specified
 
+
     /**
      * Aggregate constructor
      * @param gbfield the 0-based index of the group-by field in the tuple, or NO_GROUPING if there is no grouping
@@ -35,15 +36,18 @@ public class StringAggregator implements Aggregator {
         m_gbfieldtype = gbfieldtype;
         m_afield = afield;
         m_what = what;
-        if(what != Op.COUNT){
+        if(m_what != Op.COUNT){
         	throw new IllegalArgumentException();
         }
-        if(m_gbfield == Aggregator.NO_GROUPING){
-        	no_grouping_agg = 0;
-        }
         else{
-        	agg_map = new HashMap<Field, Integer>();
-        }    
+            if(m_gbfield == Aggregator.NO_GROUPING){
+            	no_grouping_agg = 0;
+            }
+            else{
+            	agg_map = new HashMap<Field, Integer>();
+            }         	
+        }
+  
     }
 
     /**
@@ -51,18 +55,24 @@ public class StringAggregator implements Aggregator {
      * @param tup the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
+    	//without group by
     	if(m_gbfield == Aggregator.NO_GROUPING){
-			no_grouping_agg++;
+    		//make sure aggregate field is not null
+			if(tup.getField(m_afield) != null){
+				no_grouping_agg++;
+			}
 		}
 		//with group by
 		else{
-			//Set up field
 			Field cur_field= tup.getField(m_gbfield);
-			if(agg_map.containsKey(cur_field)){
-				agg_map.put(cur_field, agg_map.get(cur_field) + 1);
-			}
-			else{
-				agg_map.put(cur_field, 1);
+			//proceed to aggregate only if type matches
+			if(cur_field.getType() == m_gbfieldtype){
+				if(agg_map.containsKey(cur_field)){
+					agg_map.put(cur_field, agg_map.get(cur_field) + 1);
+				}
+				else{
+					agg_map.put(cur_field, 1);
+				}				
 			}
 		}
     }
@@ -76,8 +86,11 @@ public class StringAggregator implements Aggregator {
      *   aggregate specified in the constructor.
      */
     public DbIterator iterator() {
-        // some code goes here
-        throw new UnsupportedOperationException("please implement me for lab2");
+    	if(m_gbfield == Aggregator.NO_GROUPING){
+        	return new StringAggregatorIterator(no_grouping_agg);
+    	}else{
+        	return new StringAggregatorIterator(agg_map, m_gbfieldtype);
+    	}
     }
 
 }

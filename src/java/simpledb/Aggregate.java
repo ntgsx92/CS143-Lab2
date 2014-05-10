@@ -20,6 +20,10 @@ public class Aggregate extends Operator {
     private Aggregator.Op m_aop;
     
     private Aggregator m_aggregator;
+    
+    private DbIterator agg_it;
+    
+    private TupleDesc agg_td;
 
     /**
      * Constructor.
@@ -44,6 +48,37 @@ public class Aggregate extends Operator {
     	m_afield = afield;
     	m_gfield = gfield;
     	m_aop = aop;
+    	String a_name = m_child.getTupleDesc().getFieldName(m_afield);
+		Type a_type = m_child.getTupleDesc().getFieldType(m_afield);
+		
+		//Set up aggregator
+		
+    	//without grouping
+    	if(m_gfield == -1){
+    		Type td_type[] = {a_type};
+    		String td_name[] = {m_aop.toString() + a_name};
+    		agg_td = new TupleDesc(td_type,td_name);
+    		if(a_type == Type.STRING_TYPE){
+    			m_aggregator = new StringAggregator(m_gfield,null,m_afield,m_aop);
+    		}
+    		else if(a_type == Type.INT_TYPE){
+    			m_aggregator = new IntegerAggregator(m_gfield,null,m_afield,m_aop);
+    		}
+    	}
+    	//with grouping
+    	else{
+        	String gb_name = m_child.getTupleDesc().getFieldName(m_gfield);
+    		Type gb_type = m_child.getTupleDesc().getFieldType(m_gfield);
+    		Type td_type[] = {gb_type,a_type};
+    		String td_name[] = {gb_name,m_aop.toString() + a_name};
+    		agg_td = new TupleDesc(td_type,td_name);
+    		if(a_type == Type.STRING_TYPE){
+    			m_aggregator = new StringAggregator(m_gfield,gb_type,m_afield,m_aop);
+    		}
+    		else if(a_type == Type.INT_TYPE){
+    			m_aggregator = new IntegerAggregator(m_gfield,gb_type,m_afield,m_aop);
+    		}
+    	}
     }
 
     /**
@@ -104,6 +139,11 @@ public class Aggregate extends Operator {
 	    TransactionAbortedException {
     	m_child.open();
     	super.open();
+    	while(m_child.hasNext()){
+    		m_aggregator.mergeTupleIntoGroup(m_child.next());
+    	}
+    	agg_it = m_aggregator.iterator();
+    	agg_it.open();
     }
 
     /**
@@ -114,20 +154,14 @@ public class Aggregate extends Operator {
      * aggregate. Should return null if there are no more tuples.
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-    	while(m_child.hasNext()){
-    		Tuple cur_tuple = m_child.next();
-        	if(m_gfield == -1){
-        		
-        	}
-        	else{
-        		
-        	}
+    	if(agg_it.hasNext()){
+    		return agg_it.next();
     	}
     	return null;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-    	m_child.rewind();
+    	agg_it.rewind();
     }
 
     /**
@@ -142,11 +176,12 @@ public class Aggregate extends Operator {
      * iterator.
      */
     public TupleDesc getTupleDesc() {
-    	return m_child.getTupleDesc();
+    	return agg_td;
     }
 
     public void close() {
     	m_child.close();
+    	agg_it.close();
     	super.close();
     }
 

@@ -1,6 +1,7 @@
 package simpledb;
 import java.util.HashMap;
-import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Knows how to compute some aggregate over a set of IntFields.
@@ -13,9 +14,17 @@ public class IntegerAggregator implements Aggregator {
 	
 	private int m_afield;
 	
+	private int ngb_count;
+	
+	private int ngb_sum;
+	
 	private Op m_what;
 	
 	private HashMap<Field,Integer> agg_map; //hashmap between groupvalue and aggregatevalue
+	
+	private HashMap<Field,Integer> field_count; //use this map to count # of apperance of a Field
+	
+	private HashMap<Field,Integer> sum_map;
 	
 	private int no_grouping_agg;//integer  which stores aggregate value when no_grouping is specified
 	
@@ -41,10 +50,13 @@ public class IntegerAggregator implements Aggregator {
         m_gbfieldtype = gbfieldtype;
         m_afield = afield;
         m_what = what;
+        field_count = new HashMap<Field,Integer>();
+        sum_map = new HashMap<Field,Integer>();
+        ngb_count = 0;
         if(m_gbfield != Aggregator.NO_GROUPING){
         	agg_map = new HashMap<Field,Integer>();
         }
-        else if(m_gbfield == Aggregator.NO_GROUPING){
+        else{
         	no_grouping_agg = 0;
         }
     }
@@ -57,12 +69,105 @@ public class IntegerAggregator implements Aggregator {
      *            the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
-    	//no grouping
-    	if(m_gbfield == Aggregator.NO_GROUPING){
-    	}
     	//with group by
+    	if(m_gbfield != Aggregator.NO_GROUPING){
+    		Field cur_field = tup.getField(m_gbfield);
+    		//Aggregate field only if type matches
+    		if(cur_field.getType() == m_gbfieldtype){
+        		int cur_agg_value = ((IntField)tup.getField(m_afield)).getValue();
+        		
+        		//Aggregate MAX
+        		if(m_what == Aggregator.Op.MAX){
+        			if(agg_map.containsKey(cur_field)){
+        				int cur_max = agg_map.get(cur_field);
+        				agg_map.put(cur_field, (cur_max>cur_agg_value ? cur_max : cur_agg_value));
+        			}else{
+        				agg_map.put(cur_field,cur_agg_value);
+        			}
+        		}
+        		
+        		//Aggregate MIN
+        		else if(m_what == Aggregator.Op.MIN){
+        			if(agg_map.containsKey(cur_field)){
+        				int cur_min = agg_map.get(cur_field);
+        				agg_map.put(cur_field, (cur_min<cur_agg_value ? cur_min : cur_agg_value));
+        			}else{
+        				agg_map.put(cur_field,cur_agg_value);
+        			}
+        		}
+        		
+        		//Aggregate SUM
+        		else if(m_what == Aggregator.Op.SUM){
+        			if(agg_map.containsKey(cur_field)){
+        				int cur_sum = agg_map.get(cur_field);
+        				agg_map.put(cur_field, cur_sum+cur_agg_value);
+        			}else{
+        				agg_map.put(cur_field,cur_agg_value);
+        			}	
+        		}
+        		
+        		//Aggregate AVG
+        		else if(m_what == Aggregator.Op.AVG){
+        			if(agg_map.containsKey(cur_field)){
+        				int cur_count = field_count.get(cur_field);
+        				int cur_sum = sum_map.get(cur_field);
+        				agg_map.put(cur_field, (cur_sum+cur_agg_value)/(cur_count+1));
+        				field_count.put(cur_field, cur_count+1);
+        				sum_map.put(cur_field, cur_sum+cur_agg_value);
+        			}
+        			else{
+        				agg_map.put(cur_field,cur_agg_value);
+        				field_count.put(cur_field, 1);
+        				sum_map.put(cur_field,cur_agg_value);
+        			}
+        		}
+        		
+        		//Aggregate COUNT
+        		else if(m_what == Aggregator.Op.COUNT){
+        			if(agg_map.containsKey(cur_field)){
+        				int cur_count = agg_map.get(cur_field);
+        				agg_map.put(cur_field, cur_count+1);
+        			}else{
+        				agg_map.put(cur_field,1);
+        			}
+        		}	
+    		}
+    	}
+    	//without group by
     	else{
-
+    		int cur_agg_value = ((IntField)tup.getField(m_afield)).getValue();
+    		
+    		//Aggregate AVG
+    		if(m_what == Aggregator.Op.AVG){
+    			if(no_grouping_agg == 0){
+    				no_grouping_agg = cur_agg_value;
+    				ngb_count = 1;
+    				ngb_sum = cur_agg_value;
+    			}else{
+        			no_grouping_agg = (ngb_sum + cur_agg_value)/(ngb_count+1);
+        			ngb_count++;
+        			ngb_sum += cur_agg_value;
+    			}
+    		}
+    		
+    		//Aggregate MAX
+    		else if(m_what == Aggregator.Op.MAX){
+    			no_grouping_agg = no_grouping_agg > cur_agg_value ? no_grouping_agg : cur_agg_value;
+    		}
+    		
+    		//Aggregate MIN
+    		else if(m_what == Aggregator.Op.MIN){
+    			no_grouping_agg = no_grouping_agg < cur_agg_value ? no_grouping_agg : cur_agg_value;
+    		}
+    		
+    		//Aggregate SUM
+    		else if(m_what == Aggregator.Op.SUM){
+    			no_grouping_agg += cur_agg_value;
+    		}
+    		//Aggregate COUNT
+    		else if(m_what == Aggregator.Op.COUNT){
+    			no_grouping_agg++;
+    		}
     	}
     }
 
@@ -75,9 +180,11 @@ public class IntegerAggregator implements Aggregator {
      *         the constructor.
      */
     public DbIterator iterator() {
-        // some code goes here
-        throw new
-        UnsupportedOperationException("please implement me for lab2");
+    	if(m_gbfield == Aggregator.NO_GROUPING){
+        	return new IntegerAggregatorIterator(no_grouping_agg);
+    	}else{
+        	return new IntegerAggregatorIterator(agg_map, m_gbfieldtype);
+    	}
     }
 
 }

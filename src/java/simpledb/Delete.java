@@ -1,6 +1,7 @@
 package simpledb;
 
 import java.io.IOException;
+import java.util.NoSuchElementException;
 
 /**
  * The delete operator. Delete reads tuples from its child operator and removes
@@ -9,6 +10,16 @@ import java.io.IOException;
 public class Delete extends Operator {
 
     private static final long serialVersionUID = 1L;
+    
+    private TransactionId m_t;
+    
+    private DbIterator m_child;
+    
+    private TupleDesc m_td;
+    
+    private int num_delete;
+    
+    private boolean isinvoked;
 
     /**
      * Constructor specifying the transaction that this delete belongs to as
@@ -20,24 +31,29 @@ public class Delete extends Operator {
      *            The child operator from which to read tuples for deletion
      */
     public Delete(TransactionId t, DbIterator child) {
-        // some code goes here
+    	m_t = t;
+    	m_child = child;
+    	m_td = m_child.getTupleDesc();
+    	num_delete = 0;
+    	isinvoked = false;
     }
 
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+    	return m_td;
     }
 
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        m_child.open();
+        super.open();
     }
 
     public void close() {
-        // some code goes here
+        m_child.close();
+        super.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        m_child.rewind();
     }
 
     /**
@@ -50,19 +66,36 @@ public class Delete extends Operator {
      * @see BufferPool#deleteTuple
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+    	if(isinvoked){
+    		return null;
+    	}
+    	while(m_child.hasNext()){
+    		try {
+				Database.getBufferPool().deleteTuple(m_t, m_child.next());
+				num_delete++;
+			} catch (NoSuchElementException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+    	}
+    	isinvoked = true;
+    	Type []td_type = {Type.INT_TYPE};
+    	String []td_name = {"Number of deleted records"};
+    	TupleDesc delete_td = new TupleDesc(td_type,td_name);
+    	Tuple result = new Tuple(delete_td);
+    	result.setField(0, new IntField(num_delete));
+    	return result;
     }
 
     @Override
     public DbIterator[] getChildren() {
-        // some code goes here
-        return null;
+    	return new DbIterator[]{m_child};
     }
 
     @Override
     public void setChildren(DbIterator[] children) {
-        // some code goes here
+        m_child = children[0];
     }
 
 }

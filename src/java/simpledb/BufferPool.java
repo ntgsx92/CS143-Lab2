@@ -71,7 +71,7 @@ public class BufferPool {
     	Page cur_page = ccmap.get(pid);
     	if(cur_page == null){
     		if(m_numpages <=ccmap.size()){
-    			throw new DbException("ccmap is full!");
+    			evictPage();
     		}
     		Catalog cur_catalog = Database.getCatalog();
     		cur_page = cur_catalog.getDatabaseFile(pid.getTableId()).readPage(pid);

@@ -22,6 +22,7 @@ public class Insert extends Operator {
     private int num_records;
     
     private boolean isinvoked;
+    private boolean tupleadded;
 
     /**
      * Constructor.
@@ -41,9 +42,9 @@ public class Insert extends Operator {
         m_t = t;
         m_child = child;
         m_tableid = tableid;
-        if(m_child.getTupleDesc() != Database.getCatalog().getTupleDesc(m_tableid)){
+        /*if(this.m_child.getTupleDesc() != Database.getCatalog().getTupleDesc(m_tableid)){
         	throw new DbException("TupleDesc does not match");
-        }
+        }*/
         m_td = new TupleDesc(new Type[]{Type.INT_TYPE}, new String[]{"NUM INSERTED"});
         num_records = 0;
         isinvoked = false;
@@ -55,8 +56,9 @@ public class Insert extends Operator {
 
     public void open() throws DbException, TransactionAbortedException {
     	isinvoked = true;
+    	super.open();
         m_child.open();
-        super.open();
+        tupleadded = false;
     }
 
     public void close() {
@@ -84,9 +86,10 @@ public class Insert extends Operator {
      * @see BufferPool#insertTuple
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-    	if(isinvoked == true){
+    	if(tupleadded == true){
     		return null;
     	}
+    	m_child.open();
     	while(m_child.hasNext()){
     		try {
 				Database.getBufferPool().insertTuple(m_t, m_tableid, m_child.next());
@@ -100,7 +103,8 @@ public class Insert extends Operator {
     	Tuple result = new Tuple(m_td);
     	Field num_inserted = new IntField(num_records);
     	result.setField(0,num_inserted);
-    	isinvoked = true;
+    	tupleadded = true;
+    	m_child.close();
     	return result;
     }
 

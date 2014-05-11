@@ -20,12 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BufferPool {
     /** Bytes per page, including header. */
     public static final int PAGE_SIZE = 4096;
-
     private static int pageSize = PAGE_SIZE;
-    
     private int m_numpages;
-    
     private ConcurrentHashMap<PageId, Page> ccmap;
+    private Map<TransactionId, Set<PageId>> m_dirtypages;
 
     
     /** Default number of pages passed to the constructor. This is used by
@@ -40,6 +38,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         m_numpages = numPages;
+        m_cache = new HashMap<TransactionId, Set<PageId>>();
         ccmap = new ConcurrentHashMap<PageId, Page>();
     }
     
@@ -146,6 +145,10 @@ public class BufferPool {
     	Catalog cur_catalog = Database.getCatalog();
     	DbFile file = cur_catalog.getDatabaseFile(tableId);
     	file.insertTuple(tid, t);
+    	ArrayList<Page> dirtied = file.insertTuple(tid, t);
+        for (Page page : dirtied) {
+   	      page.markDirty(true, tid);
+   	    }
     }
 
     /**
@@ -166,7 +169,11 @@ public class BufferPool {
         // not necessary for lab1
     	Catalog cur_catalog = Database.getCatalog();
     	DbFile file = cur_catalog.getDatabaseFile( t.getRecordId().getPageId().getTableId());
-    	file.deleteTuple(tid, t);
+    	ArrayList<Page> dirtied = file.deleteTuple(tid, t);
+    	for(Page page : dirtied)
+    	{
+    		page.markDirty(true, tid);
+    	}
     }
 
     /**
@@ -177,6 +184,10 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
+    	 for (PageId page : ccmap.keySet()) {
+    	      flushPage(page);
+    	    }
+
 
     }
 
@@ -197,6 +208,30 @@ public class BufferPool {
     private synchronized  void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+    	if (ccmap.containsKey(pid)) {
+    	      Page page = ccmap.get(pid);
+    	      TransactionId dirty = page.isDirty();
+    	      if (dirty != null) {
+    	    	  if (m_dirtypages.containsKey(dirty))
+       		   {
+       				m_dirtypages.get(dirty).add(pid);
+       		   } 
+       			else 
+       		   {
+       				 Set<PageId> dirtypages = new HashSet<PageId>();
+       				 dirtypages.add(pid);
+       				 m_dirtypages.put(dirty, dirtypages);
+       		   }
+
+    	        LogFile log = Database.getLogFile();
+    	        DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+    	        
+    	        log.logWrite(dirty, page.getBeforeImage(), page);
+    	        log.force();
+    	        file.writePage(page);
+    	        page.markDirty(false, null);
+    	      }
+    	}
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -204,6 +239,7 @@ public class BufferPool {
     public synchronized  void flushPages(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+    	
     }
 
     /**
@@ -213,6 +249,23 @@ public class BufferPool {
     private synchronized  void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+    	PageId pid = null;
+        Iterator<PageId> it = ccmap.keySet().iterator();
+    	do{
+    		pid = it.next();
+    	}
+    	while(it.hasNext() && ccmap.get(pid).isDirty() != null);
+     	if (ccmap.get(pid).isDirty() !=null || pid == null)
+     		throw new DbException("Cannot evict page");
+    	try {
+    		flushPage(pid);
+    		ccmap.remove(pid);
+    		m_numpages--;
+    	} catch (IOException e) {
+    		e.printStackTrace();
+    		throw new DbException("Cannot evict page");	
+    	}
+    	
     }
 
 }

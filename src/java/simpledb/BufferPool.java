@@ -38,7 +38,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         m_numpages = numPages;
-        m_cache = new HashMap<TransactionId, Set<PageId>>();
+        m_dirtypages = new HashMap<TransactionId, Set<PageId>>();
         ccmap = new ConcurrentHashMap<PageId, Page>();
     }
     

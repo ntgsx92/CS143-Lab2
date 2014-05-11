@@ -41,12 +41,12 @@ public class Insert extends Operator {
         m_t = t;
         m_child = child;
         m_tableid = tableid;
-        m_td = Database.getCatalog().getDatabaseFile(m_tableid).getTupleDesc();
+        if(m_child.getTupleDesc() != Database.getCatalog().getTupleDesc(m_tableid)){
+        	throw new DbException("TupleDesc does not match");
+        }
+        m_td = new TupleDesc(new Type[]{Type.INT_TYPE}, new String[]{"NUM INSERTED"});
         num_records = 0;
         isinvoked = false;
-        if(m_td != m_child.getTupleDesc()){
-        	throw new DbException("TupleDesc doesn't match");
-        }
     }
 
     public TupleDesc getTupleDesc() {
@@ -54,16 +54,19 @@ public class Insert extends Operator {
     }
 
     public void open() throws DbException, TransactionAbortedException {
+    	isinvoked = true;
         m_child.open();
         super.open();
     }
 
     public void close() {
+    	isinvoked = false;
         m_child.close();
         super.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
+    	isinvoked = true;
         m_child.rewind();
     }
 
@@ -94,10 +97,7 @@ public class Insert extends Operator {
 				e.printStackTrace();
 			}
     	}
-    	Type []td_type = {Type.INT_TYPE};
-    	String []field_name = {"Number of inserted records"};
-    	TupleDesc result_td = new TupleDesc(td_type,field_name);
-    	Tuple result = new Tuple(result_td);
+    	Tuple result = new Tuple(m_td);
     	Field num_inserted = new IntField(num_records);
     	result.setField(0,num_inserted);
     	isinvoked = true;

@@ -33,7 +33,7 @@ public class Delete extends Operator {
     public Delete(TransactionId t, DbIterator child) {
     	m_t = t;
     	m_child = child;
-    	m_td = m_child.getTupleDesc();
+    	m_td = new TupleDesc(new Type[]{Type.INT_TYPE},new String[]{"NUM DELETED"});
     	num_delete = 0;
     	isinvoked = false;
     }
@@ -43,11 +43,13 @@ public class Delete extends Operator {
     }
 
     public void open() throws DbException, TransactionAbortedException {
+    	isinvoked = false;
         m_child.open();
         super.open();
     }
 
     public void close() {
+    	isinvoked = true;
         m_child.close();
         super.close();
     }
@@ -80,10 +82,7 @@ public class Delete extends Operator {
 			}
     	}
     	isinvoked = true;
-    	Type []td_type = {Type.INT_TYPE};
-    	String []td_name = {"Number of deleted records"};
-    	TupleDesc delete_td = new TupleDesc(td_type,td_name);
-    	Tuple result = new Tuple(delete_td);
+    	Tuple result = new Tuple(m_td);
     	result.setField(0, new IntField(num_delete));
     	return result;
     }
